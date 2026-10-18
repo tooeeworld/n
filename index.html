@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>블록 프로그램 비교 설문</title>
+<script src="config.js"></script>
+<style>
+/* 10-18 3판: 설문 페이지와 같은 꼴 (흰 바탕에 검정, 회색 없음, 크림슨은 주 단추만, 글씨 크게, 가운데 폭 640 한 줄) */
+:root { --crimson: #862633; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #f2f5fb; color: #000; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', system-ui, sans-serif; word-break: keep-all; overflow-wrap: break-word; }   /* 10-18 설문 페이지와 같은 시안 1 카드형 */
+.wrap { max-width: 640px; margin: 0 auto; padding: 28px 12px; }
+.card { background: #fff; border: 0; border-radius: 18px; box-shadow: 0 2px 14px rgba(30,64,175,.10); padding: 22px 18px; }
+h1 { font-size: 26px; margin: 0 0 12px; color: #000; line-height: 1.4; }
+p { font-size: 19px; line-height: 1.7; margin: 10px 0; }
+.btn { display: inline-block; font-size: 20px; padding: 12px 22px; border-radius: 12px; border: 2px solid var(--crimson); background: var(--crimson); color: #fff; font-weight: 800; text-decoration: none; margin: 4px 6px 4px 0; min-height: 52px; }
+.muted { color: #000; font-size: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+  <h1>블록 프로그램 비교 설문</h1>
+  <p id="msg">설문지를 고르는 중입니다. 잠시만 기다려 주세요.</p>
+  <p id="links"></p>
+  <p class="muted" id="sub"></p>
+</div></div>
+<script>
+/* 시작 링크: 하던 설문지가 있으면 그것을 이어서, 아니면 응답이 가장 적은 설문지 (아직 안 한 것) 를 줌.
+   같은 사람 = 이 브라우저의 임시 번호 (무작위), 끝낸 설문지도 이 브라우저에 남음 */
+(function () {
+  var SETS = ["A", "B", "C"], K = { pid: "napoli_s5_pid", done: "napoli_s5_done", cur: "napoli_s5_cur" };
+  function get(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+  function put(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* - */ } }
+  function rnd(n) { var a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", s = ""; for (var i = 0; i < n; i++) s += a.charAt(Math.floor(Math.random() * a.length)); return s; }
+  function msg(t) { document.getElementById("msg").textContent = t; }
+  function links(h) { document.getElementById("links").innerHTML = h; }
+  var pid = get(K.pid, ""); if (!pid) { pid = "P" + rnd(9); put(K.pid, pid); }
+  var done = get(K.done, []), cur = get(K.cur, null);
+  function isDone(s) { return done.some(function (d) { return d.set === s; }); }
+  function go(set, ver) { put(K.cur, { set: set, ver: ver }); location.replace("survey_" + set + ".html?v=" + ver); }
+  var left = SETS.filter(function (s) { return !isDone(s); });
+  if (cur && SETS.indexOf(cur.set) >= 0 && !isDone(cur.set)) { msg("하던 설문지로 이동합니다."); go(cur.set, Number(cur.ver) === 2 ? 2 : 1); return; }
+  if (!left.length) {
+    msg("세 설문지를 모두 해 주셨습니다. 감사합니다.");
+    links('<a class="btn" href="coupon.html">상품권 받기</a>');
+    return;
+  }
+  var ep = String((window.NAPOLI_SURVEY || {}).endpoint || "").trim();
+  function local() {   /* 시험 모드 (저장 주소 없음) 또는 저장 서버가 대답하지 않을 때: 남은 설문지 가운데 무작위, 순서 판도 무작위 */
+    go(left[Math.floor(Math.random() * left.length)], Math.random() < 0.5 ? 1 : 2);
+  }
+  if (!ep) { local(); return; }
+  var finished = false;
+  var to = setTimeout(function () { if (!finished) { finished = true; local(); } }, 9000);
+  fetch(ep + (ep.indexOf("?") >= 0 ? "&" : "?") + "action=assign&pid=" + encodeURIComponent(pid) + "&done=" + encodeURIComponent(done.map(function (d) { return d.set; }).join(",")))
+    .then(function (r) { return r.json(); })
+    .then(function (j) { if (finished) return; finished = true; clearTimeout(to); if (j && j.ok && left.indexOf(j.set) >= 0) go(j.set, Number(j.ver) === 2 ? 2 : 1); else local(); })
+    .catch(function () { if (finished) return; finished = true; clearTimeout(to); local(); });
+})();
+</script>
+</body>
+</html>
